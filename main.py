@@ -15,7 +15,7 @@ from joblib import Parallel, delayed
 from . import settings
 from tqdm import tqdm
 
-def saveResultsFig(results_dict):
+def saveResultsFig(results_dict, prefix=""):
     """
     
     Arguments:
@@ -45,12 +45,17 @@ def saveResultsFig(results_dict):
             color = settings.model[model_name]['color']
             xs = [x for x, y in results]
             ys = [y for x, y in results]
-            axes[row_id].scatter(xs, ys, edgecolors=color, facecolors='none', label=model_name)
-            axes[row_id].set_xlabel(settings.data[dataset_name]['varying_param_name'])
-            axes[row_id].set_ylabel('MI')
-            axes[row_id].set_title(dataset_name)
-            axes[row_id].legend()
-    fig.savefig('MI', bbox_inches='tight')
+            if n_datasets > 1:
+                axe = axes[row_id]
+            else:
+                axe = axes
+            axe.scatter(xs, ys, edgecolors=color, facecolors='none', label=model_name)
+            axe.set_xlabel(settings.data[dataset_name]['varying_param_name'])
+            axe.set_ylabel('MI')
+            axe.set_title(dataset_name)
+            axe.legend()
+    figName = "{0}MI".format(prefix)
+    fig.savefig(figName, bbox_inches='tight')
     plt.close()
 
 def get_estimation(data_model, varying_param):
@@ -69,9 +74,19 @@ def get_estimation(data_model, varying_param):
     data = data_model.data
     ground_truth = data_model.ground_truth
 
+    prefix_name_loop = "{0}{1}_{2}={3}/".format(settings.prefix_name, data_model.name, data_model.varName, data_model.varValue)
+    os.mkdir(prefix_name_loop)
+
     # Fit Algorithm
     for model_name, model in settings.model.items():
+        if 'MINE' == model_name[:4]:
+            prefix_temp = model['model'].prefix
+            model['model'].prefix = "{0}{1}_".format(prefix_name_loop, model['model'].objName)
         mi_estimation = model['model'].predict(data)
+        if 'MINE' == model_name[:4]:
+            model['model'].setVaryingParamInfo(data_model.varName, data_model.varValue, ground_truth)
+            model['model'].savefigAli(data, mi_estimation)
+            model['model'].prefix = prefix_temp
 
         # Save Results
         results[model_name] = mi_estimation
@@ -97,6 +112,9 @@ def plot():
     #     ...
     # }
 
+    prefix_name = settings.prefix_name
+    os.mkdir(prefix_name)
+
     results = dict()
     results['Ground Truth'] = dict()
     for model_name in settings.model.keys():
@@ -114,7 +132,7 @@ def plot():
             for model_name, mi_estimate in aggregate_result.items():
                 results[model_name][data_name].append((varying_param, mi_estimate))
     # Plot and save
-    saveResultsFig(results)
+    saveResultsFig(results, prefix=prefix_name)
 
 
     return 0
