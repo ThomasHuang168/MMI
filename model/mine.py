@@ -314,15 +314,15 @@ class Mine():
         ax[1].legend()
 
         # Trained Function contour plot
-        delta = 0.025
-        Xmin = -1
-        Xmax = 1
+        Xmin = np.max(X)
+        Xmax = np.min(X)
+        delta = (Xmax - Xmin) / 50
         x = np.arange(Xmin, Xmax, delta)
         y = np.arange(Xmin, Xmax, delta)
         XY = np.array(np.meshgrid(x,y))
 
 
-        mini_delta = 0.005
+        mini_delta = delta / 10
         mini_Xmax = delta/2
         mini_Xmin = -delta/2
         mini_x = np.arange(mini_Xmin, mini_Xmax, mini_delta)
@@ -332,7 +332,7 @@ class Mine():
 
         Z = [self.forward_pass(XY[:,i,j][None, :]+mini_XY).item() for i in range(XY.shape[1])for j in range(XY.shape[2])]
         Z = np.array(Z).reshape(XY.shape[1], XY.shape[2])
-        CS = ax[2].contour(XY[0,:,:], XY[1,:,:], Z)
+        CS = ax[2].contour(XY[0,:,:], XY[1,:,:], Z, 2, colors='k')
         ax[2].clabel(CS, CS.levels, inline=True, fontsize=10)
 
         # Plot result with ground truth

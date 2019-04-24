@@ -45,11 +45,15 @@ def saveResultsFig(results_dict, prefix=""):
             color = settings.model[model_name]['color']
             xs = [x for x, y in results]
             ys = [y for x, y in results]
-            axes[row_id].scatter(xs, ys, edgecolors=color, facecolors='none', label=model_name)
-            axes[row_id].set_xlabel(settings.data[dataset_name]['varying_param_name'])
-            axes[row_id].set_ylabel('MI')
-            axes[row_id].set_title(dataset_name)
-            axes[row_id].legend()
+            if n_datasets > 1:
+                axe = axes[row_id]
+            else:
+                axe = axes
+            axe.scatter(xs, ys, edgecolors=color, facecolors='none', label=model_name)
+            axe.set_xlabel(settings.data[dataset_name]['varying_param_name'])
+            axe.set_ylabel('MI')
+            axe.set_title(dataset_name)
+            axe.legend()
     figName = "{0}MI".format(prefix)
     fig.savefig(figName, bbox_inches='tight')
     plt.close()
