@@ -1,6 +1,7 @@
 # import model
 from .model.linear_regression import LinearReg
 from .model.mine import Mine
+from .model.mine_entropy import Mine_ent
 from .model.kraskov import Kraskov
 from .model.cart_regression import cartReg
 
@@ -142,13 +143,12 @@ model = {
     #         ma_rate=0.01, 
     #         verbose=False,
     #         prefix=prefix_name,
-    #         marginal_mode='shuffle',
     #         objName='Dir'
     #     ), 
     #     'color': 'orange'
     # },
     'MINE_entropy': {
-        'model': Mine(
+        'model': Mine_ent(
             lr=1e-3, 
             batch_size=batch_size, 
             patience=int(20), 
@@ -158,7 +158,6 @@ model = {
             ma_rate=0.01, 
             verbose=False,
             prefix=prefix_name,
-            marginal_mode='unif',
             objName='Ent'
         ), 
         'color': 'purple'

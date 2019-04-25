@@ -89,7 +89,7 @@ class MineNet(nn.Module):
         return output
 
 class Mine():
-    def __init__(self, lr, batch_size, patience=int(20), iter_num=int(1e+3), log_freq=int(100), avg_freq=int(10), ma_rate=0.01, prefix="", verbose=True, resp=0, cond=[1], log=True, marginal_mode='shuffle', objName="", ParamName="", ParamValue=np.inf, X_GroundTruth=np.inf, y_label=""):
+    def __init__(self, lr, batch_size, patience=int(20), iter_num=int(1e+3), log_freq=int(100), avg_freq=int(10), ma_rate=0.01, prefix="", verbose=True, resp=0, cond=[1], log=True, objName="", ParamName="", ParamValue=np.inf, X_GroundTruth=np.inf):
         self.lr = lr
         self.batch_size = batch_size
         self.patience = patience  # 20
@@ -102,17 +102,12 @@ class Mine():
         self.resp = resp
         self.cond = cond
         self.log = log
-        self.marginal_mode = marginal_mode
+        self.marginal_mode = 'shuffle'
         self.objName = objName
         self.ParamName = ParamName
         self.ParamValue = ParamValue
         self.X_GroundTruth = X_GroundTruth
-        if "shuffle"==marginal_mode:
-            self.y_label = "I(X^Y)"
-        elif "unif"==marginal_mode:
-            self.y_label = "HXY"
-        else:
-            self.y_label = y_label
+        self.y_label = "I(X^Y)"
 
     def fit(self, train_data, val_data):
         self.mine_net = MineNet(input_size=len(self.cond)+1)
@@ -238,7 +233,16 @@ class Mine():
         self.fit(X_train, X_test)
     
         mi_lb = self.forward_pass(X_test)
-        return mi_lb.item()
+        mi_lb = mi_lb.item()
+        if 'unif' == self.marginal_mode:
+            if 0 == len(self.cond):
+                X_max, X_min = X[:,self.resp].max(axis=0), X[:,self.resp].min(axis=0)
+                cross = np.log(X_max-X_min)
+            else:
+                X_max, X_min = X.max(axis=0), X.min(axis=0)
+                cross = sum(np.log(X_max-X_min))
+            return cross - mi_lb
+        return mi_lb
         
         # joint , marginal = sample_joint_marginal(X, batch_size=X.shape[0], resp=self.resp, cond=self.cond)
         # joint = torch.autograd.Variable(torch.FloatTensor(joint))
@@ -295,6 +299,62 @@ class Mine():
         self.ParamValue = ParamValue
         self.X_GroundTruth = X_gt
 
+    def getTrainCurve(self, ax):
+        ax.plot(range(1,len(self.avg_train_mi_lb)+1),self.avg_train_mi_lb, label='Training Loss')
+        ax.plot(range(1,len(self.avg_valid_mi_lb)+1),self.avg_valid_mi_lb,label='Validation Loss')
+        # find position of lowest validation loss
+        minposs = self.avg_valid_mi_lb.index(min(self.avg_valid_mi_lb))+1 
+        ax.axvline(minposs, linestyle='--', color='r',label='Early Stopping Checkpoint')
+        ax.grid(True)
+        ax.legend()
+        return ax
+
+    def getHeatMap(self, ax, xs, ys, Z=None, sampleNum=0):
+        """
+        For 2-dimension MINE only
+        """
+        HXY = None
+        if np.ndarray != type(Z):
+            Z = [self.mine_net(torch.FloatTensor([[xs[i,j], ys[i,j]]])).item() for j in range(ys.shape[0]) for i in range(xs.shape[1])]
+            Z = np.array(Z).reshape(xs.shape[1], ys.shape[0])
+            if sampleNum > 0:
+                m_R = abs(xs[1,1] - xs[0,0])/2
+                m_x = np.linspace(-m_R, m_R, sampleNum)
+                m_y = np.linspace(-m_R, m_R, sampleNum)
+                m_xy = np.array(np.meshgrid(m_x, m_y))
+                m_xy = m_xy.reshape(m_xy.shape[0],m_xy.shape[1]*m_xy.shape[2]).T
+                XY = np.array((xs, ys))
+                HXY = [self.forward_pass(XY[:,i,j][None,:]+m_xy).item() for i in range(XY.shape[1]-1) for j in range(XY.shape[2]-1)]
+                HXY = np.array(HXY).reshape(XY.shape[1]-1, XY.shape[2]-1)
+            # x and y are bounds, so z should be the value *inside* those bounds.
+            # Therefore, remove the last value from the z array.
+            Z = Z[:-1, :-1]
+
+        z_min, z_max = -np.abs(Z).max(), np.abs(Z).max()
+        c = ax.pcolormesh(xs, ys, Z, cmap='RdBu', vmin=z_min, vmax=z_max)
+        # set the limits of the plot to the limits of the data
+        ax.axis([xs.min(), xs.max(), ys.min(), ys.max()])
+        return ax, HXY, c
+
+    def getResultPlot(self, ax, xs, Z=None, sampleNum=0):
+        """
+        For 1-dimension MINE only
+        """
+        HX = None
+        if np.ndarray != Z:
+            Z = [self.mine_net(torch.FloatTensor([xs[i]])).item()  for i in range(xs.shape[0])]
+            Z = np.array(Z)
+            if sampleNum > 0:
+                m_R = abs(xs[1] - xs[0])/2
+                m_x = np.linspace(-m_R, m_R, sampleNum)
+                HX = [self.forward_pass(np.broadcast_to((xs[i]+m_x)[:,None],(m_x.shape[0],2))).item() for i in range(xs.shape[0]) ]
+                HX = np.array(HX)
+        z_min, z_max = -np.abs(Z).max(), np.abs(Z).max()
+        ax.plot(xs, Z, 'ro-')
+        # set the limits of the plot to the limits of the data
+        ax.axis([xs.min(), xs.max(),z_min, z_max])
+        return ax, HX
+
     def savefigAli(self, X, X_est):
         if len(self.cond) > 1:
             raise ValueError("Only support 2-dim or 1-dim")
@@ -303,37 +363,19 @@ class Mine():
         ax[0].scatter(X[:,self.resp], X[:,self.cond], color='red', marker='o')
 
         #plot training curve
-        ax[1].plot(range(1,len(self.avg_train_mi_lb)+1),self.avg_train_mi_lb, label='Training Loss')
-        ax[1].plot(range(1,len(self.avg_valid_mi_lb)+1),self.avg_valid_mi_lb,label='Validation Loss')
-
-            # find position of lowest validation loss
-        minposs = self.avg_valid_mi_lb.index(min(self.avg_valid_mi_lb))+1 
-        ax[1].axvline(minposs, linestyle='--', color='r',label='Early Stopping Checkpoint')
-
-        ax[1].grid(True)
-        ax[1].legend()
+        ax[1] = self.getTrainCurve(ax[1])
 
         # Trained Function contour plot
-        Xmin = np.max(X)
-        Xmax = np.min(X)
-        delta = (Xmax - Xmin) / 50
-        x = np.arange(Xmin, Xmax, delta)
-        y = np.arange(Xmin, Xmax, delta)
-        XY = np.array(np.meshgrid(x,y))
-
-
-        mini_delta = delta / 10
-        mini_Xmax = delta/2
-        mini_Xmin = -delta/2
-        mini_x = np.arange(mini_Xmin, mini_Xmax, mini_delta)
-        mini_y = np.arange(mini_Xmin, mini_Xmax, mini_delta)
-        mini_XY = np.array(np.meshgrid(mini_x,mini_y))
-        mini_XY = mini_XY.reshape(mini_XY.shape[0], mini_XY.shape[1]*mini_XY.shape[2]).T
-
-        Z = [self.forward_pass(XY[:,i,j][None, :]+mini_XY).item() for i in range(XY.shape[1])for j in range(XY.shape[2])]
-        Z = np.array(Z).reshape(XY.shape[1], XY.shape[2])
-        CS = ax[2].contour(XY[0,:,:], XY[1,:,:], Z, 2, colors='k')
-        ax[2].clabel(CS, CS.levels, inline=True, fontsize=10)
+        Xmin = min(X[:,0])
+        Xmax = max(X[:,0])
+        Ymin = min(X[:,1])
+        Ymax = max(X[:,1])
+        x = np.linspace(Xmin, Xmax, 300)
+        y = np.linspace(Ymin, Ymax, 300)
+        xs, ys = np.meshgrid(x,y)
+        ax[2], Z, c = self.getHeatMap(ax[2], xs, ys)
+        fig.colorbar(c, ax=ax[2])
+        ax[2].set_title('heatmap')
 
         # Plot result with ground truth
         ax[3].scatter(0, self.X_GroundTruth, edgecolors='red', facecolors='none', label='Ground Truth')
@@ -344,9 +386,3 @@ class Mine():
         figName = "{0}MINE".format(self.prefix)
         fig.savefig(figName, bbox_inches='tight')
         plt.close()
-        
-
-
-
-
-

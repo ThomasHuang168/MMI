@@ -84,7 +84,7 @@ def get_estimation(data_model, varying_param):
             model['model'].prefix = "{0}{1}_".format(prefix_name_loop, model['model'].objName)
         mi_estimation = model['model'].predict(data)
         if 'MINE' == model_name[:4]:
-            model['model'].setVaryingParamInfo(data_model.varName, data_model.varValue, ground_truth)
+            model['model'].setVaryingParamInfo("", data_model.varValue, ground_truth)
             model['model'].savefigAli(data, mi_estimation)
             model['model'].prefix = prefix_temp
 
