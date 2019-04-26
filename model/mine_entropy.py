@@ -64,7 +64,8 @@ class Mine_ent(Mine):
     def savefigAli(self, X, X_est):
         if len(self.cond) > 1:
             raise ValueError("Only support 2-dim or 1-dim")
-        fig, ax = plt.subplots(3,4, figsize=(90, 90))
+        fig, ax = plt.subplots(3,4, figsize=(100, 75))
+        # fig, ax = plt.subplots(3,3, figsize=(60, 90))
         #plot Data
         axCur = ax[0,0]
         axCur.scatter(X[:,self.resp], X[:,self.cond], color='red', marker='o')
@@ -89,15 +90,7 @@ class Mine_ent(Mine):
         x = np.linspace(Xmin, Xmax, 300)
         y = np.linspace(Ymin, Ymax, 300)
         xs, ys = np.meshgrid(x,y)
-        # Z = [self.mine_net(torch.FloatTensor([[xs[i,j], ys[i,j]]])).item() for j in range(ys.shape[0]) for i in range(xs.shape[1])]
-        # Z = np.array(Z).reshape(xs.shape[1], ys.shape[0])
-        # # x and y are bounds, so z should be the value *inside* those bounds.
-        # # Therefore, remove the last value from the z array.
-        # Z = Z[:-1, :-1]
-        # z_min, z_max = -np.abs(Z).max(), np.abs(Z).max()
-        # c = ax[2].pcolormesh(xs, ys, Z, cmap='RdBu', vmin=z_min, vmax=z_max)
-        # # set the limits of the plot to the limits of the data
-        # ax[0,2].axis([xs.min(), xs.max(), ys.min(), ys.max()])
+
         axCur = ax[0,2]
         axCur, HXY, c = super(Mine_ent, self).getHeatMap(axCur, xs, ys, sampleNum=5)
         fig.colorbar(c, ax=axCur)

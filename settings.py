@@ -151,7 +151,7 @@ model = {
         'model': Mine_ent(
             lr=1e-3, 
             batch_size=batch_size, 
-            patience=int(20), 
+            patience=int(200), 
             iter_num=int(2e+4), 
             log_freq=int(100), 
             avg_freq=int(10), 
